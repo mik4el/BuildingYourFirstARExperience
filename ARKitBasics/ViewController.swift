@@ -8,6 +8,8 @@ Main view controller for the AR experience.
 import UIKit
 import SceneKit
 import ARKit
+import AudioToolbox.AudioServices
+import AVFoundation.AVCaptureDevice
 
 class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 	// MARK: - IBOutlets
@@ -53,8 +55,37 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         
         // Show debug UI to view performance metrics (e.g. frames per second).
         sceneView.showsStatistics = true
+        
+        // Turn on iPhone light
+        toggleFlash()
+        
     }
-	
+    
+    func toggleFlash() {
+        // from https://stackoverflow.com/questions/27207278/how-to-turn-flashlight-on-and-off-in-swift
+        let device = AVCaptureDevice.default(for: AVMediaType.video)
+        
+        if (device != nil) {
+            if (device!.hasTorch) {
+                do {
+                    try device!.lockForConfiguration()
+                    if (device!.torchMode == AVCaptureDevice.TorchMode.on) {
+                        device!.torchMode = AVCaptureDevice.TorchMode.off
+                    } else {
+                        do {
+                            try device!.setTorchModeOn(level: 1.0)
+                        } catch {
+                            print(error)
+                        }
+                    }
+                    device!.unlockForConfiguration()
+                } catch {
+                    print(error)
+                }
+            }
+        }
+    }
+    
 	override func viewWillDisappear(_ animated: Bool) {
 		super.viewWillDisappear(animated)
 		
@@ -88,6 +119,10 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
          changes in the plane anchor as plane estimation continues.
         */
         node.addChildNode(planeNode)
+        
+        // Vibrate when plane found
+        AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate))
+
 	}
 
     /// - Tag: UpdateARContent
