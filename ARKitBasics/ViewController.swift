@@ -25,6 +25,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     
 	// MARK: - View Life Cycle
 	let manager = CMMotionManager()
+    var plane_found = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -37,6 +38,10 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         
         let epsilon = 0.02
         let desired_rotation_z = -0.5 // range -1.0 to 1.0 for full rotation
+        var time_started_desired_rotation: UInt64 = 0
+        var capture_complete = false
+        var time_started_capture_complete: UInt64 = 0
+        var have_turned_on_flash = false
         
         if manager.isDeviceMotionAvailable {
             manager.deviceMotionUpdateInterval = 0.01
@@ -45,14 +50,42 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                 self?.rotX.text = String(format: "rotX: %.2f", data!.gravity.x)
                 self?.rotY.text = String(format: "rotY: %.2f", data!.gravity.y)
                 self?.rotZ.text = String(format: "rotZ: %.2f", data!.gravity.z)
-                if data!.gravity.z < desired_rotation_z - epsilon || data!.gravity.z > desired_rotation_z + epsilon {
-                    // Outside desired rotation
-                    self?.rotZ.textColor = .white
-                }
-                else {
-                    // Within desired rotation
-                    self?.rotZ.textColor = .red
-                    AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate))
+                if capture_complete || !(self?.plane_found)! {
+                    if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_capture_complete + 2000 {
+                        capture_complete = false
+                    }
+                } else {
+                    if data!.gravity.z < desired_rotation_z - epsilon || data!.gravity.z > desired_rotation_z + epsilon {
+                        // Outside desired rotation
+                        self?.rotZ.textColor = .white
+                        time_started_desired_rotation = 0
+                    }
+                    else {
+                        // Within desired rotation
+                        self?.rotZ.textColor = .red
+                        AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate))
+                        if (time_started_desired_rotation==0) {
+                            time_started_desired_rotation = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
+                        }
+                        else {
+                            if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_desired_rotation + 1000 {
+                                // turn on light
+                                if !have_turned_on_flash {
+                                    self?.turnOnFlash()
+                                    have_turned_on_flash = true
+                                }
+                            }
+                            if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_desired_rotation + 2000 {
+                                // play capture sound and turn off flash
+                                capture_complete = true
+                                time_started_capture_complete = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
+                                self?.turnOffFlash()
+                                have_turned_on_flash = false
+                                AudioServicesPlaySystemSound(1108)
+                                time_started_desired_rotation = 0
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -94,33 +127,27 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         // Show debug UI to view performance metrics (e.g. frames per second).
         sceneView.showsStatistics = true
         
-        // Turn on iPhone light
-        toggleFlash()
-        
+    }
+
+    func turnOnFlash() {
+        let device = AVCaptureDevice.default(for: AVMediaType.video)
+        do {
+            try device!.lockForConfiguration()
+            device!.torchMode = AVCaptureDevice.TorchMode.on
+            device!.unlockForConfiguration()
+        } catch {
+            print(error)
+        }
     }
     
-    func toggleFlash() {
-        // from https://stackoverflow.com/questions/27207278/how-to-turn-flashlight-on-and-off-in-swift
+    func turnOffFlash() {
         let device = AVCaptureDevice.default(for: AVMediaType.video)
-        
-        if (device != nil) {
-            if (device!.hasTorch) {
-                do {
-                    try device!.lockForConfiguration()
-                    if (device!.torchMode == AVCaptureDevice.TorchMode.on) {
-                        device!.torchMode = AVCaptureDevice.TorchMode.off
-                    } else {
-                        do {
-                            try device!.setTorchModeOn(level: 1.0)
-                        } catch {
-                            print(error)
-                        }
-                    }
-                    device!.unlockForConfiguration()
-                } catch {
-                    print(error)
-                }
-            }
+        do {
+            try device!.lockForConfiguration()
+            device!.torchMode = AVCaptureDevice.TorchMode.off
+            device!.unlockForConfiguration()
+        } catch {
+            print(error)
         }
     }
     
@@ -159,6 +186,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         node.addChildNode(planeNode)
         
         // Vibrate when plane found
+        plane_found = true
         AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate))
 
 	}
