@@ -10,6 +10,7 @@ import SceneKit
 import ARKit
 import AudioToolbox.AudioServices
 import AVFoundation.AVCaptureDevice
+import CoreMotion
 
 class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 	// MARK: - IBOutlets
@@ -18,8 +19,45 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 	@IBOutlet weak var sessionInfoLabel: UILabel!
 	@IBOutlet weak var sceneView: ARSCNView!
 
+    @IBOutlet weak var rotX: UILabel!
+    @IBOutlet weak var rotY: UILabel!
+    @IBOutlet weak var rotZ: UILabel!
+    
 	// MARK: - View Life Cycle
-	
+	let manager = CMMotionManager()
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        manager.gyroUpdateInterval = 0.1
+        manager.accelerometerUpdateInterval = 0.1
+        
+        manager.startGyroUpdates()
+        manager.startAccelerometerUpdates()
+        
+        let epsilon = 0.02
+        let desired_rotation_z = -0.5 // range -1.0 to 1.0 for full rotation
+        
+        if manager.isDeviceMotionAvailable {
+            manager.deviceMotionUpdateInterval = 0.01
+            manager.startDeviceMotionUpdates(to: OperationQueue.main) {
+                [weak self] data, error in
+                self?.rotX.text = String(format: "rotX: %.2f", data!.gravity.x)
+                self?.rotY.text = String(format: "rotY: %.2f", data!.gravity.y)
+                self?.rotZ.text = String(format: "rotZ: %.2f", data!.gravity.z)
+                if data!.gravity.z < desired_rotation_z - epsilon || data!.gravity.z > desired_rotation_z + epsilon {
+                    // Outside desired rotation
+                    self?.rotZ.textColor = .white
+                }
+                else {
+                    // Within desired rotation
+                    self?.rotZ.textColor = .red
+                    AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate))
+                }
+            }
+        }
+    }
+
     /// - Tag: StartARSession
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
