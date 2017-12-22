@@ -22,10 +22,13 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     @IBOutlet weak var rotX: UILabel!
     @IBOutlet weak var rotY: UILabel!
     @IBOutlet weak var rotZ: UILabel!
-    
+    @IBOutlet weak var distance: UILabel!
+
 	// MARK: - View Life Cycle
 	let manager = CMMotionManager()
     var plane_found = false
+    var within_distance = false
+    var angle_correct = false
     var cube: SCNBox = SCNBox()
     var cubeNode: SCNNode = SCNNode()
     
@@ -49,43 +52,45 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             manager.deviceMotionUpdateInterval = 0.01
             manager.startDeviceMotionUpdates(to: OperationQueue.main) {
                 [weak self] data, error in
-                self?.rotX.text = String(format: "rotX: %.2f", data!.gravity.x)
-                self?.rotY.text = String(format: "rotY: %.2f", data!.gravity.y)
-                self?.rotZ.text = String(format: "rotZ: %.2f", data!.gravity.z)
+                self?.rotX.text = String(format: "RotX: %.2f", data!.gravity.x)
+                self?.rotY.text = String(format: "RotY: %.2f", data!.gravity.y)
+                self?.rotZ.text = String(format: "RotZ: %.2f", data!.gravity.z)
                 // Rewrite as explicit state machine
-                if capture_complete || !(self?.plane_found)! {
-                    if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_capture_complete + 2000 {
-                        capture_complete = false
-                    }
-                } else {
-                    if data!.gravity.z < desired_rotation_z - epsilon || data!.gravity.z > desired_rotation_z + epsilon {
-                        // Outside desired rotation
-                        self?.rotZ.textColor = .white
-                        time_started_desired_rotation = 0
-                    }
-                    else {
-                        // Within desired rotation
-                        self?.rotZ.textColor = .red
-                        AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate))
-                        if (time_started_desired_rotation==0) {
-                            time_started_desired_rotation = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
+                if (self?.within_distance)! {
+                    if capture_complete || !(self?.plane_found)! {
+                        if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_capture_complete + 2000 {
+                            capture_complete = false
+                        }
+                    } else {
+                        if data!.gravity.z < desired_rotation_z - epsilon || data!.gravity.z > desired_rotation_z + epsilon {
+                            // Outside desired rotation
+                            self?.rotZ.textColor = .white
+                            time_started_desired_rotation = 0
                         }
                         else {
-                            if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_desired_rotation + 1000 {
-                                // turn on light
-                                if !have_turned_on_flash {
-                                    self?.turnOnFlash()
-                                    have_turned_on_flash = true
-                                }
+                            // Within desired rotation
+                            self?.rotZ.textColor = .red
+                            AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate))
+                            if (time_started_desired_rotation==0) {
+                                time_started_desired_rotation = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
                             }
-                            if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_desired_rotation + 2000 {
-                                // play capture sound and turn off flash
-                                capture_complete = true
-                                time_started_capture_complete = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
-                                self?.turnOffFlash()
-                                have_turned_on_flash = false
-                                AudioServicesPlaySystemSound(1108)
-                                time_started_desired_rotation = 0
+                            else {
+                                if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_desired_rotation + 1000 {
+                                    // turn on light
+                                    if !have_turned_on_flash {
+                                        self?.turnOnFlash()
+                                        have_turned_on_flash = true
+                                    }
+                                }
+                                if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_desired_rotation + 2000 {
+                                    // play capture sound and turn off flash
+                                    capture_complete = true
+                                    time_started_capture_complete = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
+                                    self?.turnOffFlash()
+                                    have_turned_on_flash = false
+                                    AudioServicesPlaySystemSound(1108)
+                                    time_started_desired_rotation = 0
+                                }
                             }
                         }
                     }
@@ -191,7 +196,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
          changes in the plane anchor as plane estimation continues.
         */
         if !plane_found {
-            cube = SCNBox(width: 0.1, height: 0.2, length: 0.3, chamferRadius: 0.03)
+            cube = SCNBox(width: 0.1, height: 0.15, length: 0.3, chamferRadius: 0.03)
             // ambient, diffuse, specular, and shininess
             cube.firstMaterial?.lightingModel = SCNMaterial.LightingModel.phong
             cube.firstMaterial?.diffuse.contents = UIColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.5)
@@ -228,16 +233,30 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         plane.height = CGFloat(planeAnchor.extent.z)
         
     }
-
+    
+    var time_since_within_distance_vibration: UInt64 = 0
+    
     // MARK: - ARSessionDelegate
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        let transform = SCNMatrix4(frame.camera.transform)
-        let location = SCNVector3(transform.m41, transform.m42, transform.m43)
-        let distance = location.distance(vector: cubeNode.convertPosition(cubeNode.position, to: nil))
-        if (distance < 0.8) {
-            self.cube.firstMaterial?.diffuse.contents = UIColor(red: 0.0, green: 1.0, blue: 0.0, alpha: 0.5)
-        } else {
-            self.cube.firstMaterial?.diffuse.contents = UIColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 0.5)
+        if plane_found == true {
+            let transform = SCNMatrix4(frame.camera.transform)
+            let location = SCNVector3(transform.m41, transform.m42, transform.m43)
+            let distance = location.distance(vector: cubeNode.convertPosition(cubeNode.position, to: nil))
+            self.distance.text = String(format: "Distance: %.2f", distance)
+            if (distance < 0.4) {
+                within_distance = true
+                self.cube.firstMaterial?.diffuse.contents = UIColor(red: 0.0, green: 1.0, blue: 0.0, alpha: 0.5)
+            } else {
+                within_distance = false
+                self.cube.firstMaterial?.diffuse.contents = UIColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 0.5)
+            }
+            if within_distance == true {
+                //vibrate every 1.8 second
+                if (UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_since_within_distance_vibration + 1800) || time_since_within_distance_vibration == 0 {
+                    AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate))
+                    time_since_within_distance_vibration = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
+                }
+            }
         }
     }
     
