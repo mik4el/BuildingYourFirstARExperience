@@ -13,6 +13,7 @@
 		842316E71F2030C300D189D1 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 842316E51F2030C300D189D1 /* Main.storyboard */; };
 		842316EC1F2030C300D189D1 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 842316EA1F2030C300D189D1 /* LaunchScreen.storyboard */; };
 		84ABEA0A1F3D15E70052D547 /* Assets.scnassets in Resources */ = {isa = PBXBuildFile; fileRef = 84ABEA091F3D15E70052D547 /* Assets.scnassets */; };
+		AB43D13D1FEDA6F200227A08 /* camera-shutter.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = AB43D13C1FEDA6F200227A08 /* camera-shutter.mp3 */; };
 		ABDFDC911FE93BA0002E44A8 /* SCNVector3Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABDFDC901FE93B9F002E44A8 /* SCNVector3Extensions.swift */; };
 /* End PBXBuildFile section */
 
@@ -26,6 +27,7 @@
 		842316ED1F2030C300D189D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		84ABEA091F3D15E70052D547 /* Assets.scnassets */ = {isa = PBXFileReference; lastKnownFileType = wrapper.scnassets; path = Assets.scnassets; sourceTree = "<group>"; };
 		8B0B79D5557A70831DCDECCE /* LICENSE.txt */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
+		AB43D13C1FEDA6F200227A08 /* camera-shutter.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "camera-shutter.mp3"; sourceTree = "<group>"; };
 		ABDFDC901FE93B9F002E44A8 /* SCNVector3Extensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCNVector3Extensions.swift; sourceTree = "<group>"; };
 		C85709121F34FC2200BB957F /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		F67C3B19719DBDC4F743CB7B /* SampleCode.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = SampleCode.xcconfig; path = Configuration/SampleCode.xcconfig; sourceTree = "<group>"; };
@@ -72,6 +74,7 @@
 				842316ED1F2030C300D189D1 /* Info.plist */,
 				84ABEA091F3D15E70052D547 /* Assets.scnassets */,
 				112FE5661F4F95A200BF85EA /* Assets.xcassets */,
+				AB43D13C1FEDA6F200227A08 /* camera-shutter.mp3 */,
 			);
 			path = ARKitBasics;
 			sourceTree = "<group>";
@@ -152,6 +155,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				84ABEA0A1F3D15E70052D547 /* Assets.scnassets in Resources */,
+				AB43D13D1FEDA6F200227A08 /* camera-shutter.mp3 in Resources */,
 				842316EC1F2030C300D189D1 /* LaunchScreen.storyboard in Resources */,
 				112FE5671F4F95A200BF85EA /* Assets.xcassets in Resources */,
 				842316E71F2030C300D189D1 /* Main.storyboard in Resources */,

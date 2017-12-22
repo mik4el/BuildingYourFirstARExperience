@@ -11,6 +11,7 @@ import ARKit
 import AudioToolbox.AudioServices
 import AVFoundation.AVCaptureDevice
 import CoreMotion
+import AVFoundation
 
 class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 	// MARK: - IBOutlets
@@ -26,15 +27,19 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 
 	// MARK: - View Life Cycle
 	let manager = CMMotionManager()
-    var plane_found = false
-    var within_distance = false
-    var angle_correct = false
     var cube: SCNBox = SCNBox()
     var cubeNode: SCNNode = SCNNode()
     
+    // states
+    var plane_found = false
+    var within_distance = false
+    var angle_correct = false
+    var capture_complete = false
+    var have_turned_on_flash = false
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+
         manager.gyroUpdateInterval = 0.1
         manager.accelerometerUpdateInterval = 0.1
         
@@ -44,9 +49,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         let epsilon = 0.02
         let desired_rotation_z = -0.5 // range -1.0 to 1.0 for full rotation
         var time_started_desired_rotation: UInt64 = 0
-        var capture_complete = false
         var time_started_capture_complete: UInt64 = 0
-        var have_turned_on_flash = false
         
         if manager.isDeviceMotionAvailable {
             manager.deviceMotionUpdateInterval = 0.01
@@ -57,9 +60,9 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                 self?.rotZ.text = String(format: "RotZ: %.2f", data!.gravity.z)
                 // Rewrite as explicit state machine
                 if (self?.within_distance)! {
-                    if capture_complete || !(self?.plane_found)! {
+                    if (self?.capture_complete)! || !(self?.plane_found)! {
                         if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_capture_complete + 2000 {
-                            capture_complete = false
+                            self?.capture_complete = false
                         }
                     } else {
                         if data!.gravity.z < desired_rotation_z - epsilon || data!.gravity.z > desired_rotation_z + epsilon {
@@ -77,18 +80,18 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                             else {
                                 if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_desired_rotation + 1000 {
                                     // turn on light
-                                    if !have_turned_on_flash {
+                                    if !(self?.have_turned_on_flash)! {
                                         self?.turnOnFlash()
-                                        have_turned_on_flash = true
+                                        self?.have_turned_on_flash = true
                                     }
                                 }
                                 if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_desired_rotation + 2000 {
                                     // play capture sound and turn off flash
-                                    capture_complete = true
+                                    self?.capture_complete = true
                                     time_started_capture_complete = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
                                     self?.turnOffFlash()
-                                    have_turned_on_flash = false
-                                    AudioServicesPlaySystemSound(1108)
+                                    self?.have_turned_on_flash = false
+                                    self?.playSound()
                                     time_started_desired_rotation = 0
                                 }
                             }
@@ -98,7 +101,32 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             }
         }
     }
+    
+    var player: AVAudioPlayer?
+    
+    func playSound() {
+        // from https://stackoverflow.com/questions/32036146/how-to-play-a-sound-using-swift
+        guard let url = Bundle.main.url(forResource: "camera-shutter", withExtension: "mp3") else { return }
 
+        do {
+            try AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayback)
+            try AVAudioSession.sharedInstance().setActive(true)
+
+            
+            /* The following line is required for the player to work on iOS 11. Change the file type accordingly*/
+            player = try AVAudioPlayer(contentsOf: url, fileTypeHint: AVFileType.mp3.rawValue)
+            
+            /* iOS 10 and earlier require the following line:
+             player = try AVAudioPlayer(contentsOf: url, fileTypeHint: AVFileTypeMPEGLayer3) */
+            
+            guard let player = player else { return }
+            
+            player.play()
+        } catch let error {
+            print(error.localizedDescription)
+        }
+    }
+    
     /// - Tag: StartARSession
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
@@ -330,5 +358,12 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = .horizontal
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+        
+        //reset state
+        plane_found = false
+        within_distance = false
+        angle_correct = false
+        capture_complete = false
+        have_turned_on_flash = false
     }
 }
