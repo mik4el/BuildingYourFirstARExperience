@@ -20,8 +20,6 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 	@IBOutlet weak var sessionInfoLabel: UILabel!
 	@IBOutlet weak var sceneView: ARSCNView!
 
-    @IBOutlet weak var rotX: UILabel!
-    @IBOutlet weak var rotY: UILabel!
     @IBOutlet weak var rotZ: UILabel!
     @IBOutlet weak var distance: UILabel!
 
@@ -47,7 +45,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         manager.startAccelerometerUpdates()
         
         let epsilon = 0.02
-        let desired_rotation_z = -0.5 // range -1.0 to 1.0 for full rotation
+        let desired_rotation_z = -0.5 // 45 deg, range -1.0 to 1.0 for full rotation
         var time_started_desired_rotation: UInt64 = 0
         var time_started_capture_complete: UInt64 = 0
         
@@ -55,11 +53,12 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             manager.deviceMotionUpdateInterval = 0.01
             manager.startDeviceMotionUpdates(to: OperationQueue.main) {
                 [weak self] data, error in
-                self?.rotX.text = String(format: "RotX: %.2f", data!.gravity.x)
-                self?.rotY.text = String(format: "RotY: %.2f", data!.gravity.y)
-                self?.rotZ.text = String(format: "RotZ: %.2f", data!.gravity.z)
+                self?.rotZ.text = String(format: "RotZ: -")
+                self?.rotZ.textColor = .white
                 // Rewrite as explicit state machine
                 if (self?.within_distance)! {
+                    self?.rotZ.text = String(format: "RotZ (~45 deg): %.1f deg", -data!.gravity.z*90.0)
+                    self?.rotZ.textColor = .red
                     if (self?.capture_complete)! || !(self?.plane_found)! {
                         if UInt64(NSDate().timeIntervalSince1970 * 1000.0) > time_started_capture_complete + 2000 {
                             self?.capture_complete = false
@@ -67,12 +66,12 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                     } else {
                         if data!.gravity.z < desired_rotation_z - epsilon || data!.gravity.z > desired_rotation_z + epsilon {
                             // Outside desired rotation
-                            self?.rotZ.textColor = .white
+                            self?.rotZ.textColor = .red
                             time_started_desired_rotation = 0
                         }
                         else {
                             // Within desired rotation
-                            self?.rotZ.textColor = .red
+                            self?.rotZ.textColor = .green
                             AudioServicesPlayAlertSound(SystemSoundID(kSystemSoundID_Vibrate))
                             if (time_started_desired_rotation==0) {
                                 time_started_desired_rotation = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
@@ -218,7 +217,6 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         // Make the plane visualization semitransparent to clearly show real-world placement.
         planeNode.opacity = 0.05
         
-        
         /*
          Add the plane visualization to the ARKit-managed node so that it tracks
          changes in the plane anchor as plane estimation continues.
@@ -227,7 +225,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             cube = SCNBox(width: 0.1, height: 0.15, length: 0.3, chamferRadius: 0.03)
             // ambient, diffuse, specular, and shininess
             cube.firstMaterial?.lightingModel = SCNMaterial.LightingModel.phong
-            cube.firstMaterial?.diffuse.contents = UIColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.5)
+            cube.firstMaterial?.diffuse.contents = UIColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.7)
             cube.firstMaterial?.shininess = 0.5
             cubeNode = SCNNode(geometry: cube)
             cubeNode.position = SCNVector3(planeAnchor.center.x, planeAnchor.center.y+Float(cube.height/2.0), planeAnchor.center.z)
@@ -270,11 +268,13 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             let transform = SCNMatrix4(frame.camera.transform)
             let location = SCNVector3(transform.m41, transform.m42, transform.m43)
             let distance = location.distance(vector: cubeNode.convertPosition(cubeNode.position, to: nil))
-            self.distance.text = String(format: "Distance: %.2f", distance)
+            self.distance.text = String(format: "Distance (<0.4m): %.2f m", distance)
             if (distance < 0.4) {
+                self.distance.textColor = .green
                 within_distance = true
                 self.cube.firstMaterial?.diffuse.contents = UIColor(red: 0.0, green: 1.0, blue: 0.0, alpha: 0.5)
             } else {
+                self.distance.textColor = .red
                 within_distance = false
                 self.cube.firstMaterial?.diffuse.contents = UIColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 0.5)
             }
